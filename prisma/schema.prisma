@@ -1,0 +1,53 @@
+// prisma/schema.prisma
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// 文章模型
+model News {
+  id         String    @id @default(uuid())
+  title      String
+  subtitle   String?
+  contentMD  String
+  author     String
+  date       DateTime  @default(now())
+  coverImage String?
+  // 與 Tag 的多對多關係
+  tags       NewsTag[]
+  // 文章內上傳的圖片
+  images     Image[]
+}
+
+// 標籤模型
+model Tag {
+  id   String    @id @default(uuid())
+  name String    @unique
+  // 與 News 的多對多關係
+  news NewsTag[]
+}
+
+// 關聯表 (多對多 pivot)
+model NewsTag {
+  newsId String
+  tagId  String
+
+  news News @relation(fields: [newsId], references: [id])
+  tag  Tag  @relation(fields: [tagId], references: [id])
+
+  @@id([newsId, tagId])
+}
+
+// 圖片模型
+model Image {
+  id         String   @id @default(uuid())
+  url        String
+  news       News     @relation(fields: [newsId], references: [id])
+  newsId     String
+  uploadedAt DateTime @default(now())
+}
