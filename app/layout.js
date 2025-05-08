@@ -1,17 +1,19 @@
-import "./globals.css";
+// app/layout.js
+"use client"; // 若使用 next-themes 的 ThemeProvider 需為 Client Component
 import { ThemeProvider } from "next-themes";
-import { NavBar } from "@/components/NavBar";
+import "./globals.css";
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="zh-Hant">
-      {/* 在伺服器渲染時，不給任何 theme 相關的 class */}
-      <body className="bg-white text-zinc-900">
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <NavBar />
-          <main className="pt-16 bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-50">
-            {children}
-          </main>
+    <html
+      lang="zh-Hant"
+      className="light" // 確保 SSR 和 client 初始一致
+      style={{ colorScheme: "light" }} // 確保 SSR 和 client 初始一致
+      suppressHydrationWarning={true} // 抑制少許不一致警告
+    >
+      <body>
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+          {children}
         </ThemeProvider>
       </body>
     </html>
