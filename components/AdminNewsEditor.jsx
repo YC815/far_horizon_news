@@ -20,12 +20,14 @@ export default function NewsEditor({ initialData }) {
     const [homeTitle, setHomeTitle] = useState(initialData?.homeTitle || "");
     const [selectedTags, setSelectedTags] = useState(initialData?.tags || []);
     const [content, setContent] = useState(initialData?.contentMD || "");
-    const [showPane, setShowPane] = useState({ images: true, editor: true, preview: true });
     const [allTags, setAllTags] = useState([]);
     const [newTagName, setNewTagName] = useState("");
     const [images, setImages] = useState([]);
     const [uploadProgress, setUploadProgress] = useState(0);
+    const [coverImage, setCoverImage] = useState(null);
+    const [references, setReferences] = useState([""]);
     const uploadRef = useRef(null);
+    const coverRef = useRef(null);
 
     useEffect(() => {
         fetch("/api/tags").then((res) => res.json()).then(setAllTags);
@@ -60,7 +62,7 @@ export default function NewsEditor({ initialData }) {
         setSelectedTags((prev) => prev.filter((name) => name !== id));
     };
 
-    const handleImageUpload = async (e) => {
+    const handleImageUpload = async (e, isCover = false) => {
         const file = e.target.files[0];
         if (!file) return;
         const fd = new FormData();
@@ -76,6 +78,7 @@ export default function NewsEditor({ initialData }) {
             if (xhr.status === 200) {
                 const img = JSON.parse(xhr.responseText);
                 setImages((prev) => [img, ...prev]);
+                if (isCover) setCoverImage(img);
             }
             setUploadProgress(0);
         };
@@ -95,6 +98,8 @@ export default function NewsEditor({ initialData }) {
             tags: selectedTags,
             contentMD: content,
             imageIds: images.map((img) => img.id),
+            coverImageId: coverImage?.id || null,
+            references,
         };
         const method = newsId ? "PATCH" : "POST";
         const url = newsId ? `/api/news/${newsId}` : "/api/news";
@@ -149,53 +154,38 @@ export default function NewsEditor({ initialData }) {
                 </div>
             </div>
 
-            <div className="flex space-x-2">
-                {Object.entries(showPane).map(([pane, visible]) => (
-                    <Button
-                        key={pane}
-                        variant={visible ? "outline" : "secondary"}
-                        size="sm"
-                        onClick={() => setShowPane((s) => ({ ...s, [pane]: !s[pane] }))}
-                    >
-                        {visible ? `隱藏 ${pane}` : `顯示 ${pane}`}
-                    </Button>
+            <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                    <h3 className="font-bold">主頁圖片</h3>
+                    <label className="cursor-pointer">
+                        <ArrowUpIcon className="w-5 h-5" />
+                        <input ref={coverRef} type="file" className="hidden" onChange={(e) => handleImageUpload(e, true)} />
+                    </label>
+                </div>
+                {coverImage && <img src={coverImage.url} alt="cover" className="w-full rounded shadow" />}
+            </div>
+
+            <div className="overflow-x-auto whitespace-nowrap space-x-2 flex pb-2 border-b">
+                {images.map((img) => (
+                    <div key={img.id} className="relative w-40 flex-shrink-0">
+                        <img src={img.url} alt={img.id} className="rounded" />
+                        <div className="absolute top-2 left-2 bg-black/50 text-white px-1 text-xs rounded">
+                            #{img.id}
+                        </div>
+                        <button
+                            className="absolute top-2 right-2 p-1 bg-white/80 rounded-full hover:bg-red-500"
+                            onClick={() => handleDeleteImage(img.id)}
+                        >
+                            <Trash2 className="w-4 h-4 text-red-600" />
+                        </button>
+                        <div className="mt-1 text-xs bg-zinc-100 dark:bg-zinc-800 p-1 rounded break-all">
+                            `![#${img.id}](${img.url})`
+                        </div>
+                    </div>
                 ))}
             </div>
 
-            <Split
-                sizes={[showPane.images ? 20 : 0, showPane.editor ? 40 : 0, showPane.preview ? 40 : 0]}
-                minSize={0}
-                gutterSize={8}
-                className="flex h-[70vh]"
-            >
-                <div className="p-2 overflow-auto border-r">
-                    <div className="flex items-center justify-between mb-2">
-                        <h3 className="font-bold">圖片列表</h3>
-                        <label className="cursor-pointer">
-                            <ArrowUpIcon className="w-5 h-5" />
-                            <input ref={uploadRef} type="file" className="hidden" onChange={handleImageUpload} />
-                        </label>
-                    </div>
-                    {uploadProgress > 0 && <progress value={uploadProgress} max={100} className="w-full mb-2 h-2 rounded" />}
-                    {images.map((img) => (
-                        <div key={img.id} className="mb-4 relative group">
-                            <img src={img.url} alt={`preview-${img.id}`} className="w-full rounded" />
-                            <div className="absolute top-2 left-2 bg-black/50 text-white px-1 text-xs rounded">
-                                #{img.id}
-                            </div>
-                            <button
-                                className="absolute top-2 right-2 p-1 bg-white/80 rounded-full hover:bg-red-500"
-                                onClick={() => handleDeleteImage(img.id)}
-                            >
-                                <Trash2 className="w-4 h-4 text-red-600" />
-                            </button>
-                            <div className="mt-1 text-xs bg-zinc-100 dark:bg-zinc-800 p-1 rounded break-all">
-                                `![#${img.id}](${img.url})`
-                            </div>
-                        </div>
-                    ))}
-                </div>
-
+            <Split sizes={[60, 40]} minSize={0} gutterSize={8} className="flex h-[70vh]">
                 <div className="w-full h-full">
                     <Editor
                         height="100%"
@@ -207,18 +197,54 @@ export default function NewsEditor({ initialData }) {
                     />
                 </div>
 
-                <div className="p-2 overflow-auto prose dark:prose-invert">
-                    <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
-                        rehypePlugins={[rehypeRaw]}
-                        components={{
-                            img: ({ node, ...props }) => (
-                                <img {...props} className="max-w-full rounded shadow" />
-                            )
-                        }}
-                    >
-                        {content}
-                    </ReactMarkdown>
+                <div className="p-2 overflow-auto">
+                    <div className="prose prose-lg prose-slate dark:prose-invert">
+                        <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            rehypePlugins={[rehypeRaw]}
+                            components={{
+                                img: ({ node, ...props }) => (
+                                    <img {...props} className="max-w-full rounded shadow" />
+                                ),
+                                a: ({ href, children, ...props }) => {
+                                    const isExternal = href && !href.startsWith("/");
+                                    return (
+                                        <a
+                                            href={href}
+                                            {...props}
+                                            target={isExternal ? "_blank" : undefined}
+                                            rel={isExternal ? "noopener noreferrer" : undefined}
+                                            className="text-blue-600 underline"
+                                        >
+                                            {children}
+                                        </a>
+                                    );
+                                },
+                            }}
+                        >
+                            {content}
+                        </ReactMarkdown>
+                    </div>
+
+                    <div className="mt-4 space-y-2">
+                        <h4 className="font-bold">參考來源</h4>
+                        {references.map((ref, idx) => (
+                            <div key={idx} className="flex items-start gap-2">
+                                <div className="mt-2">{idx + 1}.</div>
+                                <textarea
+                                    className="w-full p-2 border rounded resize-none"
+                                    value={ref}
+                                    rows={2}
+                                    onChange={(e) => {
+                                        const newRefs = [...references];
+                                        newRefs[idx] = e.target.value;
+                                        setReferences(newRefs);
+                                    }}
+                                />
+                            </div>
+                        ))}
+                        <Button onClick={() => setReferences([...references, ""])}>新增參考</Button>
+                    </div>
                 </div>
             </Split>
 

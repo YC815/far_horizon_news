@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Search, Sun, Moon } from "lucide-react";
 import ThemeSwitch from "@/components/ThemeSwitch";
 
-export function NavBar() {
+export default function NavBar() {
 
 
     return (
