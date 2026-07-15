@@ -1,0 +1,45 @@
+# 依賴
+node_modules
+npm-debug.log*
+pnpm-debug.log*
+yarn-error.log*
+
+# Next.js
+.next
+out
+build
+
+# 環境變數
+.env
+.env.*
+!.env.docker
+
+# Git
+.git
+.gitignore
+
+# 開發工具
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# 測試
+coverage
+.nyc_output
+
+# 日誌
+logs
+*.log
+
+# 作業系統
+.DS_Store
+Thumbs.db
+
+# 其他
+README.md
+*.md
+!README.docker.md
+dependency-graph.json
+.cache

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { supabase } from "@/lib/supabase";
+import { uploadFile, generateFileName } from "@/lib/storage";
 
 // GET：讀取所有圖片
 export async function GET() {
@@ -38,47 +38,25 @@ export async function POST(request) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    const timestamp = Date.now();
-    const originalName = file.name;
-    const fileName = `${timestamp}-${originalName}`;
-
+    // 生成唯一檔案名稱
+    const fileName = generateFileName(file.name);
     console.log(`📦 上傳檔案名稱：${fileName}`);
 
-    const { data: up, error: upErr } = await supabase.storage
-      .from("images")
-      .upload(fileName, file, { cacheControl: "3600", upsert: false });
+    // 使用統一儲存介面上傳（自動判斷 MinIO 或 Supabase）
+    const { url, path } = await uploadFile(file, fileName);
 
-    if (upErr) {
-      console.error("🔥 Supabase 上傳錯誤：", upErr.message);
-      throw new Error(`Supabase upload error: ${upErr.message}`);
-    }
+    console.log("🌐 圖片 URL：", url);
 
-    const { data: urlData, error: urlErr } = supabase.storage
-      .from("images")
-      .getPublicUrl(up.path);
-
-    if (urlErr) {
-      console.error("🔥 Supabase URL 錯誤：", urlErr.message);
-      throw new Error(`Supabase getPublicUrl error: ${urlErr.message}`);
-    }
-
-    const publicUrl = urlData.publicUrl;
-    if (!publicUrl) {
-      console.error("❌ Supabase 回傳空的 publicUrl");
-      throw new Error("Supabase returned empty publicUrl");
-    }
-
-    console.log("🌐 圖片 public URL：", publicUrl);
-
+    // 儲存到資料庫
     const img = await prisma.image.create({
       data: {
-        url: publicUrl,
-        path: up.path,
+        url,
+        path,
         newsId: newsId,
       },
     });
 
-    console.log("✅ Prisma 資料建立成功，圖片 ID：", img.id);
+    console.log("✅ 圖片上傳成功，ID：", img.id);
     return NextResponse.json(img);
   } catch (err) {
     console.error("🔥 /api/images 發生例外：", err);

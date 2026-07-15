@@ -16,6 +16,7 @@
 # next.js
 /.next/
 /out/
+next
 
 # production
 /build
@@ -30,8 +31,12 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files (保留範本檔案)
+.env
+.env*.local
+.env.production
+!.env.docker
+!.env.example
 
 # vercel
 .vercel
@@ -39,3 +44,29 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# prisma
+*.db
+*.db-journal
+dev.db
+dev.db-journal
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# logs
+logs
+*.log
+
+# cache
+.cache/
+[webpack.cache.PackFileCacheStrategy]
+fhn@0.1.0
+
+# temp files
+dependency-graph.json
+my.sheerid.com/

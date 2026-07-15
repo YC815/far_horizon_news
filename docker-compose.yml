@@ -1,0 +1,100 @@
+version: '3.9'
+
+services:
+  # PostgreSQL 資料庫
+  postgres:
+    image: postgres:17-alpine
+    container_name: fhn_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: fhn_user
+      POSTGRES_PASSWORD: fhn_password
+      POSTGRES_DB: fhn_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fhn_user -d fhn_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MinIO 物件儲存（取代 Supabase Storage）
+  minio:
+    image: minio/minio:latest
+    container_name: fhn_minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio_admin
+      MINIO_ROOT_PASSWORD: minio_password
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"  # API
+      - "9001:9001"  # Console UI
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MinIO 初始化（建立 bucket）
+  minio_init:
+    image: minio/mc:latest
+    container_name: fhn_minio_init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set myminio http://minio:9000 minio_admin minio_password;
+      mc mb myminio/images --ignore-existing;
+      mc anonymous set download myminio/images;
+      exit 0;
+      "
+
+  # Next.js 應用程式
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fhn_app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      # 資料庫連線
+      DATABASE_URL: postgresql://fhn_user:fhn_password@postgres:5432/fhn_db
+
+      # 儲存模式（minio 或 supabase）
+      STORAGE_MODE: minio
+
+      # MinIO 設定
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_ACCESS_KEY: minio_admin
+      MINIO_SECRET_KEY: minio_password
+      MINIO_BUCKET: images
+      MINIO_USE_SSL: false
+
+      # Next.js 設定
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: http://localhost:3000
+    ports:
+      - "3000:3000"
+    volumes:
+      # 開發模式可掛載程式碼
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+
+volumes:
+  postgres_data:
+    driver: local
+  minio_data:
+    driver: local

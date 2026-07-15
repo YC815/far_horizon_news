@@ -1,70 +1,84 @@
 // app/api/news/route.js
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 
 export async function GET() {
-  const list = await prisma.news.findMany({
-    include: {
-      tags: { include: { tag: true } },
-      images: true,
-    },
-    orderBy: { date: "desc" },
-  });
+  try {
+    const list = await prisma.news.findMany({
+      include: {
+        tags: true,
+        images: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
 
-  // 格式化回傳：把多對多關聯拆平
-  const result = list.map((n) => ({
-    id: n.id,
-    title: n.title,
-    subtitle: n.subtitle,
-    author: n.author,
-    date: n.date,
-    coverImage: n.coverImage,
-    tags: n.tags.map((t) => t.tag.name),
-    images: n.images.map((img) => ({ id: img.id, url: img.url })),
-    contentMD: n.contentMD,
-  }));
+    // 格式化回傳：把多對多關聯拆平
+    const result = list.map((n) => ({
+      id: n.id,
+      homeTitle: n.homeTitle,
+      title: n.title,
+      subtitle: n.subtitle,
+      coverImage: n.coverImage,
+      createdAt: n.createdAt,
+      tags: n.tags.map((tag) => tag.name),
+      images: n.images.map((img) => ({ id: img.id, url: img.url })),
+      contentMD: n.contentMD,
+      contentHTML: n.contentHTML,
+    }));
 
-  return NextResponse.json(result);
+    return NextResponse.json(result);
+  } catch (error) {
+    console.error("❌ GET /api/news 錯誤：", error);
+    return NextResponse.json(
+      { error: "Failed to fetch news", details: error.message },
+      { status: 500 }
+    );
+  }
 }
 
-// app/api/news/route.js
 export async function POST(request) {
-  const {
-    title,
-    subtitle,
-    contentMD,
-    author,
-    date,
-    coverImage,
-    tags, // Array<string>
-  } = await request.json();
-
-  const news = await prisma.news.create({
-    data: {
+  try {
+    const {
+      homeTitle,
       title,
       subtitle,
       contentMD,
-      author,
-      date: new Date(date),
+      contentHTML,
       coverImage,
-      tags: {
-        create: tags.map((name) => ({
-          tag: {
-            connectOrCreate: {
-              where: { name },
-              create: { name },
-            },
-          },
-        })),
-      },
-      images: {
-        connect: imageIds.map((id) => ({ id })),
-      },
-    },
-    include: {
-      tags: { include: { tag: true } },
-    },
-  });
+      tags = [], // Array<string>
+      imageIds = [], // Array<string>
+    } = await request.json();
 
-  return NextResponse.json(news);
+    const news = await prisma.news.create({
+      data: {
+        homeTitle,
+        title,
+        subtitle,
+        contentMD,
+        contentHTML,
+        coverImage,
+        tags: {
+          connectOrCreate: tags.map((tagName) => ({
+            where: { name: tagName },
+            create: { name: tagName },
+          })),
+        },
+        images: {
+          connect: imageIds.map((id) => ({ id })),
+        },
+      },
+      include: {
+        tags: true,
+        images: true,
+      },
+    });
+
+    return NextResponse.json(news);
+  } catch (error) {
+    console.error("❌ POST /api/news 錯誤：", error);
+    return NextResponse.json(
+      { error: "Failed to create news", details: error.message },
+      { status: 500 }
+    );
+  }
 }
